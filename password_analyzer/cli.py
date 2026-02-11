@@ -5,7 +5,8 @@ import getpass
 import os
 import sys
 
-from .analyzer import PasswordAnalyzer
+from .analyzer import AnalysisResult, PasswordAnalyzer
+from .generator import DEFAULT_LENGTH, generate_password
 
 COLORS = {
     "red": "\033[91m",
@@ -45,7 +46,7 @@ def build_score_bar(score: int, width: int = 30) -> str:
     return f"[{bar}] {score}/100"
 
 
-def print_result(result: "AnalysisResult") -> None:
+def print_result(result: AnalysisResult, verbose: bool = False) -> None:
     """Print a formatted analysis result to stdout."""
     print()
     print(f"  {colorize('Password Strength Report', 'bold')}")
@@ -56,6 +57,16 @@ def print_result(result: "AnalysisResult") -> None:
     print(f"  Entropy:  {result.entropy_bits:.1f} bits")
     print(f"  Length:   {result.password_length} characters")
     print()
+
+    if verbose:
+        print(f"  {colorize('Check Breakdown:', 'bold')}")
+        print(f"  {'Check':<22} {'Score':>7}  {'Details'}")
+        print(f"  {'-' * 55}")
+        for check in result.checks:
+            score_str = f"{check.score:>4.0f}/{check.max_score:.0f}"
+            detail = "; ".join(check.feedback) if check.feedback else "-"
+            print(f"  {check.name:<22} {score_str:>7}  {detail}")
+        print()
 
     suggestions = [f for f in result.feedback if any(
         word in f.lower() for word in ["add ", "too ", "low entropy", "extremely common",
@@ -105,12 +116,45 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Disable colored output.",
     )
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed per-check score breakdown.",
+    )
+    parser.add_argument(
+        "--generate", "-g",
+        nargs="?",
+        const=DEFAULT_LENGTH,
+        type=int,
+        metavar="LENGTH",
+        help=f"Generate a strong random password (default: {DEFAULT_LENGTH} chars).",
+    )
+    parser.add_argument(
+        "--no-symbols",
+        action="store_true",
+        help="Exclude symbols from generated passwords.",
+    )
 
     args = parser.parse_args(argv)
 
     if args.no_color or not sys.stdout.isatty():
         _use_color = False
 
+    # Generate mode
+    if args.generate is not None:
+        password = generate_password(
+            length=args.generate,
+            use_symbols=not args.no_symbols,
+        )
+        print()
+        print(f"  {colorize('Generated password:', 'bold')} {password}")
+
+        analyzer = PasswordAnalyzer()
+        result = analyzer.analyze(password)
+        print_result(result, verbose=args.verbose)
+        return
+
+    # Analyze mode
     if args.stdin:
         password = sys.stdin.readline().rstrip("\n")
     elif args.password is not None:
@@ -124,4 +168,4 @@ def main(argv: list[str] | None = None) -> None:
 
     analyzer = PasswordAnalyzer()
     result = analyzer.analyze(password)
-    print_result(result)
+    print_result(result, verbose=args.verbose)

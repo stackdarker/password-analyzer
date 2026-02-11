@@ -35,6 +35,45 @@ class TestCLIWithArgs:
         assert "Score:" in output
 
 
+class TestCLIVerbose:
+    def test_verbose_shows_breakdown(self, capsys):
+        main(["--no-color", "--verbose", "Hello123!"])
+        output = capsys.readouterr().out
+        assert "Check Breakdown:" in output
+        assert "Length" in output
+        assert "Character variety" in output
+        assert "Entropy" in output
+
+    def test_no_verbose_hides_breakdown(self, capsys):
+        main(["--no-color", "Hello123!"])
+        output = capsys.readouterr().out
+        assert "Check Breakdown:" not in output
+
+
+class TestCLIGenerate:
+    def test_generate_default(self, capsys):
+        main(["--no-color", "--generate"])
+        output = capsys.readouterr().out
+        assert "Generated password:" in output
+        assert "Score:" in output
+
+    def test_generate_custom_length(self, capsys):
+        main(["--no-color", "--generate", "24"])
+        output = capsys.readouterr().out
+        assert "Generated password:" in output
+
+    def test_generate_no_symbols(self, capsys):
+        main(["--no-color", "--generate", "--no-symbols"])
+        output = capsys.readouterr().out
+        assert "Generated password:" in output
+
+    def test_generate_with_verbose(self, capsys):
+        main(["--no-color", "--generate", "--verbose"])
+        output = capsys.readouterr().out
+        assert "Generated password:" in output
+        assert "Check Breakdown:" in output
+
+
 class TestCLISubprocess:
     def test_help_flag(self):
         result = subprocess.run(
